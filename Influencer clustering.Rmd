@@ -1,0 +1,240 @@
+---
+title: "Presentation clustering"
+author: "Linh Phung"
+date: "2023-11-02"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data cleaning
+
+
+```{r }
+data <- read.csv("top_insta_influencers_data.csv")
+head(data)
+```
+
+```{r}
+# Define the conversion function
+convert_to_numeric <- function(str) {
+  # Extract the last character
+  last_char <- substr(str, nchar(str), nchar(str))
+  # Initialize a vector to store the results
+  result <- numeric(length(str))
+  for (i in 1:length(str)) {
+    # Handle the cases for "k," "m," and "b"
+    if (last_char[i] == "k") {
+      result[i] <- as.numeric(substr(str[i], 1, nchar(str[i]) - 1)) * 1e3
+    } else if (last_char[i] == "m") {
+      result[i] <- as.numeric(substr(str[i], 1, nchar(str[i]) - 1)) * 1e6
+    } else if (last_char[i] == "b") {
+      result[i] <- as.numeric(substr(str[i], 1, nchar(str[i]) - 1)) * 1e9
+    } else {
+      result[i] <- as.numeric(str[i])
+    }
+  }
+  return(result)
+}
+
+# Apply the function to specific columns in the dataframe using mutate
+cols_to_convert <- c(4, 5, 6, 8, 9)
+data[, cols_to_convert] <- lapply(data[, cols_to_convert], convert_to_numeric)
+```
+
+```{r}
+data$X60_day_eng_rate <- as.numeric(sub("%", "", data$X60_day_eng_rate))/100
+df <- data[,-c(1,2,10)]
+```
+
+```{r}
+new_df <- df[df$new_post_avg_like!=0,]
+summary(new_df)
+```
+
+```{r}
+final_df <- scale(new_df)
+```
+
+# K-means clustering
+
+```{r}
+#install.packages("dbscan")
+library(dbscan)
+```
+
+```{r}
+kNNdistplot(final_df, k = 3)
+abline(h = 2.5, col = "red")
+```
+
+```{r}
+db <- dbscan(final_df, eps = 2.2, minPts = 4)
+db
+```
+
+```{r}
+clean_data1 <- data.frame(final_df[which(db$cluster != 0), ])
+set.seed(100)
+km <- kmeans(clean_data1, centers = 3, nstart = 30)
+```
+
+```{r}
+library(factoextra)
+factoextra::fviz_nbclust(clean_data1, kmeans, method='silhouette', k.max=15)
+```
+
+```{r}
+factoextra::fviz_nbclust(clean_data1, kmeans, method='wss', k.max=15)
+```
+
+
+```{r}
+library(ggplot2)
+library(factoextra)
+fviz_cluster(km, data = clean_data1, centroids = TRUE, repel = FALSE)
+```
+
+# Descriptive Analysis
+
+```{r}
+new_df['stt'] <- rownames(new_df)
+cluster <- data.frame(km$cluster)
+cluster$stt <- rownames(cluster)
+outcome <- merge(new_df, cluster, on="stt")
+```
+
+```{r}
+# Calculate the average per cluster
+avg_posts <- aggregate(outcome$posts, by=list(outcome$km.cluster), FUN=mean)
+
+# Create a bar plot using ggplot2
+ggplot(avg_posts, aes(x=Group.1, y=x)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Cluster") +
+  ylab("Average Posts") +
+  ggtitle("Average Posts per Cluster")
+```
+
+
+```{r}
+# Calculate the average per cluster
+avg_fl <- aggregate(outcome$followers, by=list(outcome$km.cluster), FUN=mean)
+
+# Create a bar plot using ggplot2
+ggplot(avg_fl, aes(x=Group.1, y=x)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Cluster") +
+  ylab("Average Posts") +
+  ggtitle("Average Followers per Cluster")
+```
+```{r}
+# Calculate the average per cluster
+avg_like <- aggregate(outcome$avg_likes, by=list(outcome$km.cluster), FUN=mean)
+
+# Create a bar plot using ggplot2
+ggplot(avg_like, aes(x=Group.1, y=x)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Cluster") +
+  ylab("Average Posts") +
+  ggtitle("Average Likes per Cluster")
+```
+
+```{r}
+# Calculate the average per cluster
+avg_eng <- aggregate(outcome$X60_day_eng_rate, by=list(outcome$km.cluster), FUN=mean)
+
+# Create a bar plot using ggplot2
+ggplot(avg_eng, aes(x=Group.1, y=x)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Cluster") +
+  ylab("Average Posts") +
+  ggtitle("Average Engagement in 60 days per Cluster")
+```
+
+# Outlier Analysis
+
+Since outliers may come from big stars on Instagram, we should conduct analysis to understand them.
+
+```{r}
+outliers <- data.frame(data[which(db$cluster == 0), ])
+outliers
+```
+```{r}
+# mean value
+mean_follower <- mean(data$followers, na.rm = TRUE)
+
+# Create a bar plot using ggplot2
+ggplot(outliers, aes(x=channel_info, y=followers)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Influencers") +
+  ylab("Followers") +
+  ggtitle("Followers per Influencers") +
+  geom_hline(yintercept = mean_follower, color = "red", linetype = "dashed") + 
+  geom_text(aes(x = 2, y = mean_follower, label = paste("Mean Followers: ", round(mean_follower, 2)), vjust = -1), color = "red")  # Add text for the red line
+```
+
+```{r}
+# mean value
+mean_post <- mean(data$posts)
+
+# Create a bar plot using ggplot2
+ggplot(outliers, aes(x=channel_info, y=posts)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Influencers") +
+  ylab("Posts") +
+  ggtitle("Posts per Influencers") +
+  geom_hline(yintercept = mean_post, color = "red", linetype = "dashed") + 
+  geom_text(aes(x = 1.5, y = mean_post, label = paste("Mean Posts: ", round(mean_post, 2)), vjust = -1), color = "red")  # Add text for the red line
+```
+
+Some of them (cristiano, kyliejenner, zendaya) have high or close to avg posts and high number of followers.
+
+```{r}
+# mean value
+mean_like <- mean(data$total_likes)
+
+# Create a bar plot using ggplot2
+ggplot(outliers, aes(x=channel_info, y=total_likes)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Influencers") +
+  ylab("Posts") +
+  ggtitle("Likes per Influencers") +
+  geom_hline(yintercept = mean_like, color = "red", linetype = "dashed") + 
+  geom_text(aes(x = 1.7, y = mean_like, label = paste("Mean Likes: ", round(mean_like, 2)), vjust = -1), color = "red")  # Add text for the red line
+```
+Some of them (cristiano, kyliejenner, zendaya) have very high total likes and avg likes per post.
+
+```{r}
+# mean value
+mean_avg_like <- mean(data$avg_likes)
+
+# Create a bar plot using ggplot2
+ggplot(outliers, aes(x=channel_info, y=avg_likes)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Influencers") +
+  ylab("Posts") +
+  ggtitle("Avg. Likes per post per Influencers") +
+  geom_hline(yintercept = mean_avg_like , color = "red", linetype = "dashed") + 
+  geom_text(aes(x = 2, y = mean_avg_like , label = paste("Mean Avg. Likes: ", round(mean_avg_like , 2)), vjust = -1), color = "red")  # Add text for the red line
+```
+
+```{r}
+# mean value
+mean_60_eng <- mean(data$X60_day_eng_rate, na.rm = TRUE)
+
+# Create a bar plot using ggplot2
+ggplot(outliers, aes(x=channel_info, y=X60_day_eng_rate)) +
+  geom_bar(stat="identity", fill="blue") +
+  xlab("Influencers") +
+  ylab("Posts") +
+  ggtitle("60 days engagement rate per Influencers") +
+  geom_hline(yintercept = mean_60_eng , color = "red", linetype = "dashed") + 
+  geom_text(aes(x = 2, y = mean_60_eng , label = paste("Mean 60 days engagement: ", round(mean_60_eng , 2)), vjust = -1), color = "red")  # Add text for the red line
+```
+
+Most of them are not active recently, except for zendaya
+
+
