@@ -8,12 +8,10 @@ library(rvest)
 
 
 ## ----cars--------------------------------------------------------------------------------------------------------------------
-# URL of the website
 url <- 'https://www.imdb.com/title/tt15239678/reviews?spoiler=hide&sort=curated&dir=desc&ratingFilter=0'
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
-# Set up live HTML for interaction with the website
 dune_html <- LiveHTML$new(url)
 
 
@@ -36,13 +34,11 @@ for (i in 1:49) {
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
-# Initiate dataframe to store reviews
 df <- data.frame(rating = character(), review = character(), title = character()
                  , stringsAsFactors = FALSE)
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
-# Get number of containers of reviews
 containers <- html_elements(dune_html, xpath = './/div[@class = "lister-item-content"]')
 length(containers)
 
@@ -93,4 +89,8 @@ for (i in 1:length(containers)) {
 ## ----------------------------------------------------------------------------------------------------------------------------
 # Export DataFrame df to a CSV file
 write.csv(df, file = "dune2.csv", row.names = FALSE)
+
+
+## ----------------------------------------------------------------------------------------------------------------------------
+knitr::purl("ReviewScrapping.Rmd", output = "Movie Review WebScrapping.R")
 
