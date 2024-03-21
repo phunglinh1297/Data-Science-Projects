@@ -8,15 +8,18 @@ library(rvest)
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
+# Link to the website
 url <- 'https://www.imdb.com/title/tt15239678/reviews?spoiler=hide&sort=curated&dir=desc&ratingFilter=0'
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
+# Set up Live HTML for interative web scrapping
 dune_html <- LiveHTML$new(url)
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
-num_clicks <- ceiling(1241 / 25)
+# Number of click "load more" button
+num_clicks <- ceiling(1347 / 25) - 1
 num_clicks
 
 
@@ -26,19 +29,21 @@ click_load_more <- function() {
   dune_html$click('#load-more-trigger', n_clicks = 1) 
 }
 
-# Use a for loop to click the "load more" button 50 times with a delay of 1 second between clicks
-for (i in 1:49) {
+# Use a for loop to click the "load more" button 53 times with a delay of 1 second between clicks
+for (i in 1:num_clicks) {
   click_load_more()
   Sys.sleep(1)  # Add a 1-second delay after each click
 } 
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
+# Create a dataframe for storing data
 df <- data.frame(rating = character(), review = character(), title = character()
                  , stringsAsFactors = FALSE)
 
 
 ## ----------------------------------------------------------------------------------------------------------------------------
+# Number of containers of reviews
 containers <- html_elements(dune_html, xpath = './/div[@class = "lister-item-content"]')
 length(containers)
 
